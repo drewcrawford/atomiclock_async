@@ -5,6 +5,7 @@ Where a mutex would block, we yield execution.
 This can be considered an async version of `atomiclock`.
  */
 
+use std::mem::ManuallyDrop;
 use std::pin::Pin;
 
 
@@ -18,7 +19,8 @@ pub struct AtomicLockAsync<T> {
 
 #[derive(Debug)]
 pub struct Guard<'a, T> {
-    _guard: atomiclock::Guard<'a, T>,
+    _guard: ManuallyDrop<atomiclock::Guard<'a, T>>,
+    lock: &'a AtomicLockAsync<T>,
 }
 
 struct Future<'a, T> {
@@ -40,11 +42,19 @@ impl<T> AtomicLockAsync<T> {
 */
     pub fn lock_if_available(&self) -> Option<Guard<'_, T>> {
         self.lock.lock()
-            .map(|guard| Guard { _guard: guard })
+            .map(|guard| Guard { _guard: ManuallyDrop::new(guard), lock: self })
     }
 
     pub async fn lock(&self) -> Guard<'_, T> {
         Future{ lock: self }.await
+    }
+}
+
+impl<T> Drop for Guard<'_, T> {
+    fn drop(&mut self) {
+        unsafe{ManuallyDrop::drop(&mut self._guard)}; //release the lock first
+        //then wake any tasks
+        self.lock.wakelist.wake_all();
     }
 }
 
@@ -55,7 +65,7 @@ impl<'a, T> std::future::Future for Future<'a, T> {
         self.lock.wakelist.push(cx.waker().clone());
         let guard = self.lock.lock.lock();
         if let Some(guard) = guard {
-            std::task::Poll::Ready(Guard { _guard: guard })
+            std::task::Poll::Ready(Guard { _guard: ManuallyDrop::new(guard), lock: self.lock })
         } else {
             std::task::Poll::Pending
         }
