@@ -81,6 +81,7 @@ impl<'a, T> std::future::Future for LockFuture<'a, T> {
 }
 
 
+#[derive(Debug)]
 pub struct LockWarnFuture<'a, T> {
     underlying_future: LockFuture<'a, T>,
     perfwarn_interval: Option<dlog::interval::PerfwarnInterval>,
