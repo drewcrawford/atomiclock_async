@@ -23,6 +23,7 @@ pub struct Guard<'a, T> {
     lock: &'a AtomicLockAsync<T>,
 }
 
+#[derive(Debug)]
 pub struct LockFuture<'a, T> {
     lock: &'a AtomicLockAsync<T>,
 }
