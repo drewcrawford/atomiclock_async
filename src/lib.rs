@@ -23,10 +23,9 @@ pub struct Guard<'a, T> {
     lock: &'a AtomicLockAsync<T>,
 }
 
-struct Future<'a, T> {
+pub struct LockFuture<'a, T> {
     lock: &'a AtomicLockAsync<T>,
 }
-
 
 
 impl<T> AtomicLockAsync<T> {
@@ -45,8 +44,8 @@ impl<T> AtomicLockAsync<T> {
             .map(|guard| Guard { _guard: ManuallyDrop::new(guard), lock: self })
     }
 
-    pub async fn lock(&self) -> Guard<'_, T> {
-        Future{ lock: self }.await
+    pub fn lock(&self) -> LockFuture<T> {
+        LockFuture{ lock: self }
     }
 }
 
@@ -58,7 +57,7 @@ impl<T> Drop for Guard<'_, T> {
     }
 }
 
-impl<'a, T> std::future::Future for Future<'a, T> {
+impl<'a, T> std::future::Future for LockFuture<'a, T> {
     type Output = Guard<'a, T>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
