@@ -7,7 +7,7 @@ This can be considered an async version of `atomiclock`.
 
 use std::mem::ManuallyDrop;
 use std::pin::Pin;
-
+use dlog::perfwarn_begin;
 
 #[derive(Debug)]
 pub struct AtomicLockAsync<T> {
@@ -47,6 +47,15 @@ impl<T> AtomicLockAsync<T> {
     pub fn lock(&self) -> LockFuture<T> {
         LockFuture{ lock: self }
     }
+
+    /**
+    Like lock, but with a performance warning.
+
+    Use this to indicate that the use of lock is suspicious.
+    */
+    pub fn lock_warn(&self) -> LockWarnFuture<T> {
+        LockWarnFuture{ underlying_future: self.lock(), perfwarn_interval: None }
+    }
 }
 
 impl<T> Drop for Guard<'_, T> {
@@ -71,7 +80,30 @@ impl<'a, T> std::future::Future for LockFuture<'a, T> {
     }
 }
 
-/*
+
+pub struct LockWarnFuture<'a, T> {
+    underlying_future: LockFuture<'a, T>,
+    perfwarn_interval: Option<dlog::interval::PerfwarnInterval>,
+}
+
+impl<'a, T> std::future::Future for LockWarnFuture<'a, T> {
+    type Output = Guard<'a, T>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+        let unchecked_mut = unsafe{self.get_unchecked_mut()};
+        if let None = unchecked_mut.perfwarn_interval {
+            unchecked_mut.perfwarn_interval = Some(perfwarn_begin!("AtomicLockAsync::lock"));
+        }
+        let underlying_future = unsafe{Pin::new_unchecked(&mut unchecked_mut.underlying_future)};
+        let r = underlying_future.poll(cx);
+        if let std::task::Poll::Ready(_) = r {
+            unchecked_mut.perfwarn_interval.take();
+        }
+        r
+    }
+}
+
+    /*
 boilerplate notes.
 
 1.  Clone can't be implemented without async lock

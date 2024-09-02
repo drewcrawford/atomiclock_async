@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 atomiclock = {git = "ssh://gitea@gitea.mermaid-gecko.ts.net/Metropolis/atomiclock.git"}
 wakelist = {git = "ssh://gitea@gitea.mermaid-gecko.ts.net/Metropolis/wakelist.git"}
+dlog = {git = "ssh://gitea@gitea.mermaid-gecko.ts.net/Metropolis/dlog.git"}
