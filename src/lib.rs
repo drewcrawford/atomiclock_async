@@ -62,8 +62,8 @@ impl<T> AtomicLockAsync<T> {
 impl<T> Drop for Guard<'_, T> {
     fn drop(&mut self) {
         unsafe{ManuallyDrop::drop(&mut self._guard)}; //release the lock first
-        //then wake any tasks
-        self.lock.wakelist.wake_all();
+        //then wake a task.
+        self.lock.wakelist.wake_one_pop();
     }
 }
 
