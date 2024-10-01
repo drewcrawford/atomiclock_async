@@ -36,6 +36,12 @@ impl<T> AtomicLockAsync<T> {
             wakelist: wakelist::WakeList::new(),
         }
     }
+    /**
+    Returns a reference to the underlying lock.
+    */
+    pub const fn underlying_lock(&self) -> &atomiclock::AtomicLock<T> {
+        &self.lock
+    }
 
     /**
     Locks the lock if it is available, returning a guard if it is.
