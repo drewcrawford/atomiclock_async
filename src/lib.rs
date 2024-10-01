@@ -23,6 +23,7 @@ pub struct Guard<'a, T> {
     lock: &'a AtomicLockAsync<T>,
 }
 
+
 #[derive(Debug)]
 pub struct LockFuture<'a, T> {
     lock: &'a AtomicLockAsync<T>,
@@ -36,12 +37,7 @@ impl<T> AtomicLockAsync<T> {
             wakelist: wakelist::WakeList::new(),
         }
     }
-    /**
-    Returns a reference to the underlying lock.
-    */
-    pub const fn underlying_lock(&self) -> &atomiclock::AtomicLock<T> {
-        &self.lock
-    }
+
 
     /**
     Locks the lock if it is available, returning a guard if it is.
@@ -70,6 +66,12 @@ impl<T> Drop for Guard<'_, T> {
         unsafe{ManuallyDrop::drop(&mut self._guard)}; //release the lock first
         //then wake a task.
         self.lock.wakelist.wake_one_pop();
+    }
+}
+
+impl<T> Guard<'_, T> {
+    pub const fn lock(&self) -> &AtomicLockAsync<T> {
+        self.lock
     }
 }
 
