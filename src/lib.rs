@@ -7,7 +7,7 @@ This can be considered an async version of `atomiclock`.
 
 use std::mem::ManuallyDrop;
 use std::pin::Pin;
-use dlog::perfwarn_begin;
+use logwise::perfwarn_begin;
 
 #[derive(Debug)]
 pub struct AtomicLockAsync<T> {
@@ -93,7 +93,7 @@ impl<'a, T> std::future::Future for LockFuture<'a, T> {
 #[derive(Debug)]
 pub struct LockWarnFuture<'a, T> {
     underlying_future: LockFuture<'a, T>,
-    perfwarn_interval: Option<dlog::interval::PerfwarnInterval>,
+    perfwarn_interval: Option<logwise::interval::PerfwarnInterval>,
 }
 
 impl<'a, T> std::future::Future for LockWarnFuture<'a, T> {
