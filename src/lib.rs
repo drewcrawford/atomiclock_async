@@ -7,14 +7,16 @@ This can be considered an async version of `atomiclock`.
 
 use std::mem::ManuallyDrop;
 use std::pin::Pin;
+use std::sync::Arc;
+use std::task::Poll;
+use atomic_waker::AtomicWaker;
 use logwise::perfwarn_begin;
 
 #[derive(Debug)]
 pub struct AtomicLockAsync<T> {
     lock: atomiclock::AtomicLock<T>,
-    wakelist: wakelist::WakeList,
+    wakelist: atomiclock_spinlock::Lock<Vec<Arc<AtomicWaker>>>,
 }
-
 
 
 #[derive(Debug)]
@@ -27,6 +29,7 @@ pub struct Guard<'a, T> {
 #[derive(Debug)]
 pub struct LockFuture<'a, T> {
     lock: &'a AtomicLockAsync<T>,
+    registered_waker: Option<Arc<AtomicWaker>>,
 }
 
 
@@ -34,7 +37,7 @@ impl<T> AtomicLockAsync<T> {
     pub const fn new(t: T) -> Self {
         AtomicLockAsync {
             lock: atomiclock::AtomicLock::new(t),
-            wakelist: wakelist::WakeList::new(),
+            wakelist: atomiclock_spinlock::Lock::new(vec![])
         }
     }
 
@@ -48,7 +51,7 @@ impl<T> AtomicLockAsync<T> {
     }
 
     pub fn lock(&self) -> LockFuture<T> {
-        LockFuture{ lock: self }
+        LockFuture{ lock: self, registered_waker: None }
     }
 
     /**
@@ -63,9 +66,15 @@ impl<T> AtomicLockAsync<T> {
 
 impl<T> Drop for Guard<'_, T> {
     fn drop(&mut self) {
-        unsafe{ManuallyDrop::drop(&mut self._guard)}; //release the lock first
+        unsafe{ManuallyDrop::drop(&mut self._guard)}; //release the underlying lock first
         //then wake a task.
-        self.lock.wakelist.wake_one_pop();
+        {
+            let mut lock = self.lock.wakelist.spin_lock_warn();
+            for drain in lock.drain(..) {
+                drain.wake();
+            }
+        }
+
     }
 }
 
@@ -78,13 +87,27 @@ impl<T> Guard<'_, T> {
 impl<'a, T> std::future::Future for LockFuture<'a, T> {
     type Output = Guard<'a, T>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
-        self.lock.wakelist.push(cx.waker().clone());
-        let guard = self.lock.lock.lock();
-        if let Some(guard) = guard {
-            std::task::Poll::Ready(Guard { _guard: ManuallyDrop::new(guard), lock: self.lock })
-        } else {
-            std::task::Poll::Pending
+    fn poll(mut self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+        match self.lock.lock.lock() {
+            Some(guard) => {
+                std::task::Poll::Ready(Guard{_guard: ManuallyDrop::new(guard), lock: self.lock})
+            },
+            None => {
+                match self.registered_waker {
+                    Some(ref waker) => {
+                        waker.register(cx.waker());
+                        Poll::Pending
+                    },
+                    None => {
+                        let waker = Arc::new(AtomicWaker::new());
+                        waker.register(cx.waker());
+                        self.lock.wakelist.spin_lock_warn().push(waker.clone());
+                        self.registered_waker = Some(waker);
+
+                        Poll::Pending
+                    }
+                }
+            }
         }
     }
 }
