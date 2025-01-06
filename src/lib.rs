@@ -1,8 +1,10 @@
+//SPDX-License-Identifier: MIT OR Apache-2.0
+
 /*! Provides a non-blocking Mutex.
 
 Where a mutex would block, we yield execution.
 
-This can be considered an async version of `atomiclock`.
+This can be considered an async version of [`atomiclock`](https://sealedabstract.com/code/atomiclock).
  */
 
 use std::mem::ManuallyDrop;
@@ -27,6 +29,7 @@ pub struct Guard<'a, T> {
 
 
 #[derive(Debug)]
+#[must_use]
 pub struct LockFuture<'a, T> {
     lock: &'a AtomicLockAsync<T>,
     registered_waker: Option<Arc<AtomicWaker>>,
@@ -34,6 +37,9 @@ pub struct LockFuture<'a, T> {
 
 
 impl<T> AtomicLockAsync<T> {
+    /**
+    Creates a new lock.
+*/
     pub const fn new(t: T) -> Self {
         AtomicLockAsync {
             lock: atomiclock::AtomicLock::new(t),
@@ -50,6 +56,9 @@ impl<T> AtomicLockAsync<T> {
             .map(|guard| Guard { _guard: ManuallyDrop::new(guard), lock: self })
     }
 
+    /**
+    Locks the lock.
+*/
     pub fn lock(&self) -> LockFuture<T> {
         LockFuture{ lock: self, registered_waker: None }
     }
@@ -61,6 +70,13 @@ impl<T> AtomicLockAsync<T> {
     */
     pub fn lock_warn(&self) -> LockWarnFuture<T> {
         LockWarnFuture{ underlying_future: self.lock(), perfwarn_interval: None }
+    }
+
+    /**
+    Consumes the lock, returning the inner value.
+*/
+    pub fn into_inner(self) -> T {
+        self.lock.into_inner()
     }
 }
 
@@ -79,6 +95,9 @@ impl<T> Drop for Guard<'_, T> {
 }
 
 impl<T> Guard<'_, T> {
+    /**
+    Accesses the underlying lock.
+*/
     pub const fn lock(&self) -> &AtomicLockAsync<T> {
         self.lock
     }
@@ -114,6 +133,7 @@ impl<'a, T> std::future::Future for LockFuture<'a, T> {
 
 
 #[derive(Debug)]
+#[must_use]
 pub struct LockWarnFuture<'a, T> {
     underlying_future: LockFuture<'a, T>,
     perfwarn_interval: Option<logwise::interval::PerfwarnInterval>,
@@ -167,46 +187,8 @@ Now let's check guard boilerplate.
 
 Can't clone; locks are exclusive
 similarly, no copy
-partialEq/Eq are ok
  */
 
-impl<'a, T: PartialEq> PartialEq for Guard<'a, T> {
-    fn eq(&self, other: &Self) -> bool {
-        self._guard.eq(&other._guard)
-    }
-}
-
-impl<'a, T: Eq> Eq for Guard<'a, T> {}
-
-//partialOrd, Ord,
-
-impl<'a, T: PartialOrd> PartialOrd for Guard<'a, T> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self._guard.partial_cmp(&other._guard)
-    }
-}
-
-impl<'a, T: Ord> Ord for Guard<'a, T> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self._guard.cmp(&other._guard)
-    }
-}
-
-//hash
-
-impl<'a, T: std::hash::Hash> std::hash::Hash for Guard<'a, T> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self._guard.hash(state)
-    }
-}
-
-//default, no
-//display
-impl <'a, T: std::fmt::Display> std::fmt::Display for Guard<'a, T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self._guard.fmt(f)
-    }
-}
 
 //from/into, no
 

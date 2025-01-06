@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-atomiclock = {git = "ssh://gitea@gitea.mermaid-gecko.ts.net/Metropolis/atomiclock.git"}
-atomiclock_spinlock = {git = "ssh://gitea@gitea.mermaid-gecko.ts.net/Metropolis/atomiclock_spinlock.git"}
+atomiclock = "0.1.0"
+atomiclock_spinlock = "0.1.0"
 atomic-waker = "~1"
 logwise = "~0"
