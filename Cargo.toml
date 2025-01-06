@@ -2,6 +2,14 @@
 name = "atomiclock_async"
 version = "0.1.0"
 edition = "2021"
+authors = ["Drew Crawford <drew@sealedabstract.com>"]
+description = "A simple async lock"
+repository = "https://github.com/drewcrawford/atomiclock_async"
+homepage = "https://sealedabstract.com/code/atomiclock_async"
+license = "MIT OR Apache-2.0"
+keywords = ["async", "lock", "mutex"]
+categories = ["concurrency","asynchronous","rust-patterns"]
+exclude = [".*"]
 
 [dependencies]
 atomiclock = "0.1.0"
